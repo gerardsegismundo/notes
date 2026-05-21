@@ -1,0 +1,187 @@
+# AWS Certified Solutions Architect - Associate (SAA-C03) Study Notes
+## Focus Domain: Amazon S3 (Core/Advanced/Security), CloudFormation, and Global Accelerator
+
+---
+
+## 1. Amazon S3 Basics & Core Concepts
+
+Amazon Simple Storage Service (Amazon S3) is an object storage service offering industry-leading scalability, data availability, security, and performance[cite: 1]. 
+
+### Core Architecture
+* **Objects (Files):** The fundamental entities stored in S3[cite: 1]. Every object consists of:
+  * **Key:** The absolute path/name of the object (e.g., `media/images/photo.png`)[cite: 1].
+  * **Value:** The actual data payload (sequence of bytes)[cite: 1].
+  * **Version ID:** Unique identifier used when versioning is enabled[cite: 1].
+  * **Metadata:** Key-value pairs containing object properties (system-defined like `Content-Type`, or user-defined)[cite: 1].
+  * **Tags:** Up to 10 key-value pairs per object for access control and billing tracking[cite: 1].
+  * **Access Control Lists (ACLs):** Individual object-level permissions (largely legacy; IAM/Bucket policies are preferred)[cite: 1].
+* **Buckets (Containers):** Objects are stored in buckets[cite: 1]. 
+  * Buckets must have a **globally unique name** across all AWS accounts[cite: 1].
+  * Buckets are defined at the **Regional level**, but the S3 namespace is global[cite: 1].
+
+### S3 Basics Cheat Sheet
+* **Object Size Limits:** Max object size is **5 TB**[cite: 1]. Max payload size for a single upload operation via `PutObject` is **5 GB**[cite: 1]. For objects larger than 100 MB, **Multipart Upload** should be used; it is *required* for objects larger than 5 GB[cite: 1].
+* **Consistency Model:** Amazon S3 delivers **strong read-after-write consistency** for PUT and DELETE operations of objects in all AWS Regions[cite: 1]. This applies to both writes of new objects and updates to existing objects[cite: 1].
+
+### S3 Standard Storage Class
+* **Durability:** **11 9s (99.999999999%)** design durability by replicating objects across a minimum of 3 distinct Availability Zones (AZs) within a region[cite: 1].
+* **Availability:** **99.99%** design availability[cite: 1].
+
+---
+
+## 2. Advanced S3 Features
+
+To architect cost-effective, performant, and resilient applications, you must master advanced S3 features[cite: 1].
+
+### S3 Storage Classes & Lifecycle Management
+Optimizing storage tiering directly influences cost-efficiency[cite: 1].
+
+| Storage Class | Designed Availability | Minimum Storage Duration | Retrieval Fees | Ideal Use Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **S3 Standard** | 99.99% | None | None | Active, frequently accessed data. |
+| **S3 Standard-IA** | 99.9% | 30 days | Per GB retrieved | Infrequently accessed data needed immediately when requested. |
+| **S3 One Zone-IA** | 99.5% | 30 days | Per GB retrieved | Non-critical, reproducible data stored in a single AZ (lower cost). |
+| **S3 Glacier Instant Retrieval** | 99.9% | 90 days | Per GB retrieved | Archival data requiring millisecond retrieval times. |
+| **S3 Glacier Flexible Retrieval** | 99.99% | 90 days | Per GB retrieved | Archive data with retrieval options from 1–5 mins (Expedited), 3–5 hrs (Standard), or 5–12 hrs (Bulk). |
+| **S3 Glacier Deep Archive** | 99.9% | 180 days | Per GB retrieved | Long-term digital preservation with 12-hour (Standard) or 48-hour (Bulk) retrievals. |
+| **S3 Intelligent-Tiering** | 99.9% | None | None | Data with unknown or changing access patterns. Automates tiering across Frequent, Infrequent, Archive Instant, Archive, and Deep Archive access tiers without operational overhead. |
+
+* **S3 Lifecycle Rules:** Used to automate transitions between classes (`Transition actions`) or permanent deletion (`Expiration actions`)[cite: 1].
+  * Can target current object versions or noncurrent object versions[cite: 1].
+  * Useful for compliance or optimizing logs[cite: 1].
+
+### S3 Versioning & Object Locks
+* **Versioning:** Keeps multiple variants of an object in the same bucket[cite: 1].
+  * Enabled at the bucket level[cite: 1]. Once enabled, it can only be **Suspended**, not completely disabled[cite: 1].
+  * Deleting an object with versioning enabled creates a **Delete Marker**[cite: 1]. To permanently delete an object, you must specify the exact `Version ID`[cite: 1].
+* **S3 Object Lock:** Adheres to the **WORM (Write Once, Read Many)** model[cite: 1]. Requires versioning to be enabled first[cite: 1].
+  * **Retention Period:** Blocks deletion for a specified time[cite: 1].
+    * *Compliance Mode:* The retention period cannot be shortened, and the protection cannot be bypassed by any user (including the root account)[cite: 1].
+    * *Governance Mode:* Special permissions (`s3:BypassGovernanceRetention`) allow authorized roles to bypass or alter settings[cite: 1].
+  * **Legal Hold:** Places an indefinite hold on an object until explicitly removed[cite: 1]. No retention dates apply[cite: 1].
+
+### Replication (CRR and SRR)
+Replication requires **Versioning** enabled on both the Source and Destination buckets[cite: 1].
+* **Cross-Region Replication (CRR):** Replicates objects across buckets in different AWS Regions[cite: 1]. Used for geo-redundancy, lower latency requirements, or compliance[cite: 1].
+* **Same-Region Replication (SRR):** Replicates objects across buckets in the same Region[cite: 1]. Used for log aggregation, or isolating production and test environments[cite: 1].
+* *Note:* S3 can replicate objects across different AWS accounts[cite: 1]. Existing objects are *not* automatically replicated by default when replication rules are first turned on (requires S3 Batch Operations)[cite: 1].
+
+### S3 Performance Optimization
+* **Multipart Upload:** Breaks files into smaller chunks[cite: 1]. Uploads occur in parallel, maximizing throughput and enabling recovery from network errors mid-upload[cite: 1].
+* **S3 Transfer Acceleration:** Leverages AWS Edge Locations[cite: 1]. Traffic traverses Amazon's optimized global backbone network instead of the public internet to reach the target bucket[cite: 1].
+* **S3 Select & Amazon Athena:** 
+  * **S3 Select:** Filters data using simple SQL expressions at the storage layer, returning only a subset of data (e.g., rows/columns from a CSV or JSON file), saving network transfer and computing overhead[cite: 1].
+  * **Amazon Athena:** A serverless query service used to analyze large volumes of unstructured/structured data directly in S3 via standard SQL[cite: 1].
+
+---
+
+## 3. Amazon S3 Security & Compliance
+
+Securing data on S3 is a critical component of the SAA-C03 exam[cite: 1]. You must understand how to enforce least privilege access control and encrypt data at rest and in transit[cite: 1].
+
+### Data at Rest Encryption
+S3 provides four primary models for encrypting objects at rest[cite: 1]:
+
+1. **SSE-S3 (Server-Side Encryption with Amazon S3-Managed Keys):**
+   * S3 automatically manages keys[cite: 1]. 
+   * Uses AES-256 encryption[cite: 1].
+   * Default encryption for all new S3 buckets[cite: 1].
+2. **SSE-KMS (Server-Side Encryption with AWS KMS Keys):**
+   * Uses AWS Key Management Service to manage encryption keys[cite: 1].
+   * Provides audit trails via AWS CloudTrail showing exactly when a key was used to decrypt an object[cite: 1].
+   * Subject to KMS API concurrency limits (can require performance tuning/throttling mitigation via KMS key quotas)[cite: 1].
+3. **SSE-C (Server-Side Encryption with Customer-Provided Keys):**
+   * The customer manages the keys entirely; AWS handles encryption and decryption during transactions but does *not* store the key[cite: 1].
+   * Customer must provide the encryption key in the HTTPS request header for every read/write[cite: 1].
+4. **CSE (Client-Side Encryption):**
+   * Data is encrypted locally before being transmitted over the network to S3[cite: 1].
+
+### Data in Transit Encryption
+* Enforced via **Bucket Policies** by explicitly denying requests that do not use secure transport protocol (`aws:SecureTransport: false`)[cite: 1]. This guarantees that connections only occur over HTTPS (TLS)[cite: 1].
+
+### Access Control & Permissions
+* **IAM Policies:** Attached directly to users, groups, or roles to dictate what API calls they can execute against S3 resources[cite: 1].
+* **Bucket Policies:** Resource-based policies attached directly to the S3 bucket[cite: 1].
+  * *Common Use Cases:* Granting public read access (for static websites), enforcing cross-account access, or requiring encryption headers (`s3:x-amz-server-side-encryption`)[cite: 1].
+* **S3 Block Public Access:** A centralized bucket-level or account-level toggle that overrides any bucket policies or ACLs that allow public access[cite: 1]. Essential safeguard against accidental data exposure[cite: 1].
+
+### Network Isolation & Architecture Security
+* **VPC Endpoints (Gateway Endpoint for S3):** Allows EC2 instances inside a private subnet to securely communicate with S3 without traversing the public internet or utilizing a NAT Gateway[cite: 1].
+  * Completely free of charge[cite: 1].
+  * Configured via VPC Route Tables[cite: 1].
+* **S3 Access Points:** Named network endpoints attached to buckets to simplify managing data access at scale for shared datasets[cite: 1]. Each access point has its own specific IAM policy[cite: 1].
+
+---
+
+## 4. AWS CloudFormation (Infrastructure as Code)
+
+CloudFormation allows you to model, provision, and manage AWS and third-party resources by treating infrastructure as code (YAML or JSON templates).
+
+### Core Concepts for SAA-C03
+* **Templates:** Declarative configuration files written in JSON or YAML.
+* **Stacks:** A collection of AWS resources managed as a single unit. Creating, updating, or deleting a stack creates, updates, or deletes the resources defined in the template.
+* **Parameters:** Enables passing custom values to your template at runtime (e.g., choosing instance types or bucket names dynamically).
+* **Mappings:** Static lookup tables inside the template (e.g., mapping Region names to specific AMI IDs).
+* **Outputs:** Values returned after stack creation, making them viewable in the console or importable by other stacks (e.g., the URL of an S3 bucket or an Elastic Load Balancer).
+
+### Advanced Mechanics & Disaster Recovery
+* **StackSets:** Allows you to deploy a CloudFormation stack across **multiple AWS accounts and Regions** with a single operation. Essential for enterprise-wide compliance or consistent resource landing zones.
+* **Rollbacks & Drift Detection:**
+  * **Rollbacks:** If resource creation fails during a stack deployment/update, CloudFormation automatically rolls back, deleting newly created resources to return to the last known stable state.
+  * **Drift Detection:** Identifies whether unmanaged changes have been made to resources outside of CloudFormation management (e.g., an administrator manually modifying an S3 bucket policy via the console).
+* **Deletion Policies (`DeletionPolicy`):** Controls what happens to a resource when its stack is deleted. 
+  * Options: `Delete` (default), `Retain` (keeps resource active), or `Snapshot` (creates a backup before deleting; works on EBS, RDS, etc.).
+  * *S3 Catch:* If an S3 bucket is *not empty*, a CloudFormation deletion attempt will fail unless you specify a retention policy or use automated custom scripts to empty it first.
+
+---
+
+## 5. AWS Global Accelerator
+
+AWS Global Accelerator is a networking service that improves the availability and performance of your applications with local or global users.
+
+### How It Works
+* It provides **two static Anycast public IP addresses** that serve as a fixed entry point to your application.
+* Instead of routing traffic over the public internet, it onboard traffic at the closest AWS Edge Location. The traffic then traverses **Amazon's private, congestion-free global backbone network** to reach your backend infrastructure.
+
+### Global Accelerator vs. Amazon CloudFront vs. S3 Transfer Acceleration
+The exam frequently tests your ability to choose between these edge network technologies:
+
+| Feature | AWS Global Accelerator | Amazon CloudFront | S3 Transfer Acceleration |
+| :--- | :--- | :--- | :--- |
+| **Primary Use Case** | Optimizing **TCP/UDP** traffic globally for non-HTTP or HTTP apps (Gaming, VoIP, Multi-region routing). | Content Delivery Network (CDN) designed to cache static/dynamic **HTTP/HTTPS** web assets. | Specifically optimized for speeding up **S3 bucket data uploads/downloads** over long distances[cite: 1]. |
+| **Caching** | No caching capabilities. | High-performance content edge caching. | No caching capabilities (uses edge endpoints purely for routing data directly into S3)[cite: 1]. |
+| **Target Backends** | Application Load Balancers, Network Load Balancers, EC2 Instances, Elastic IPs. | S3 Buckets, EC2 Instances, ALBs, or non-AWS HTTP origins. | Exclusively Amazon S3 buckets[cite: 1]. |
+| **Protocols** | TCP and UDP. | HTTP, HTTPS, WebSockets. | HTTP, HTTPS (via S3 API endpoints)[cite: 1]. |
+
+### High Availability Features
+* **Instant Failover:** Global Accelerator continuously monitors endpoint health. If an application backend in one AWS Region fails, it instantly reroutes user traffic to the next closest healthy Region in less than 30 seconds.
+* **Traffic Dialing / Weights:** Allows you to control how much traffic goes to specific AWS Regions (great for blue/green deployments or geographic canary testing).
+
+---
+
+## 6. Integrated Architectural Patterns & Exam Scenarios
+
+### Scenario 1: Multi-Region High Availability & Rapid Disaster Recovery
+* **Problem:** A globally distributed gaming application requires less than 50ms latency for UDP game state traffic. It needs instantaneous regional failover if an entire AWS Region suffers a catastrophic outage.
+* **Solution:** 
+  1. Deploy infrastructure across two AWS Regions using **CloudFormation StackSets** to guarantee identical template configurations.
+  2. Implement **AWS Global Accelerator** configured with the two static Anycast IPs as the primary entry point.
+  3. Route traffic to Network Load Balancers (NLBs) in both Regions. If Region A fails, Global Accelerator automatically shifts the UDP traffic to Region B immediately without waiting for client DNS caches to expire.
+
+### Scenario 2: Standardizing Multi-Account S3 Security Deployments
+* **Problem:** A centralized security compliance team needs to guarantee that all S3 buckets created across 50 separate AWS accounts have *S3 Block Public Access* enabled and *SSE-KMS encryption* enforced automatically by default.
+* **Solution:**
+  1. Define the ideal secured S3 bucket configuration inside an infrastructure-as-code template.
+  2. Use **CloudFormation StackSets** integrated with AWS Organizations to push this template out to all existing and newly created accounts.
+  3. Use CloudFormation **Drift Detection** to monitor if any account administrator attempts to manually loosen up S3 security settings afterwards.
+
+---
+
+## Quick Reference / Study Checklist
+- [ ] Understand the differences between **SSE-S3** vs **SSE-KMS** vs **SSE-C**[cite: 1].
+- [ ] Recall that **Gateway Endpoints** are free and route S3 traffic privately from a VPC[cite: 1].
+- [ ] Remember that **Versioning** must be enabled for **CRR/SRR** and **Object Lock**[cite: 1].
+- [ ] Differentiate **Glacier Instant** (ms access) vs **Glacier Flexible** (mins to hours) vs **Glacier Deep Archive** (12–48 hours).
+- [ ] Distinguish **Global Accelerator** (Anycast IP, non-cached TCP/UDP optimization) from **CloudFront** (HTTP edge caching) and **S3 Transfer Acceleration** (S3 data upload optimization)[cite: 1].
+- [ ] Identify **CloudFormation StackSets** as the primary solution for multi-region or multi-account boilerplate deployments.
+- [ ] Remember that an S3 bucket configuration with a default `DeletionPolicy` will fail to delete via CloudFormation if the bucket contains objects.
